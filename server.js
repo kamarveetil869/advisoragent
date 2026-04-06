@@ -1,46 +1,84 @@
 import express from "express";
 import cors from "cors";
-import OpenAI from "openai";
+import { OpenAI } from "langchain/llms/openai";
+import { initializeAgentExecutorWithOptions } from "langchain/agents";
+import { Tool } from "langchain/tools";
+import { ChatMemory } from "langchain/memory";
+import { evaluate } from "mathjs";
+import "dotenv/config";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
+// 🔑 LLM Setup
+const llm = new OpenAI({
+  openAIApiKey: process.env.OPENROUTER_API_KEY,
+  modelName: "mistralai/mixtral-8x7b-instruct",
+  temperature: 0.7,
 });
+
+// 🛠 Define Tools
+
+const calculator = new Tool({
+  name: "Calculator",
+  description: "Use this to perform math calculations.",
+  func: async (input) => {
+    try {
+      return evaluate(input).toString();
+    } catch (e) {
+      return "Invalid calculation";
+    }
+  },
+});
+
+const getTime = new Tool({
+  name: "GetTime",
+  description: "Get the current server time in ISO format.",
+  func: async () => new Date().toISOString(),
+});
+
+// Add more tools as needed
+const tools = [calculator, getTime];
+
+// 🔄 Session-based chat memory
+const sessions = {}; // key = sessionId
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, sessionId } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ reply: "Message is required" });
+    if (!message) return res.status(400).json({ reply: "Message required" });
+
+    // Initialize memory for session if needed
+    if (!sessions[sessionId]) {
+      sessions[sessionId] = new ChatMemory({ memoryKey: "chat_history" });
     }
 
-    const completion = await client.chat.completions.create({
-      model: "mistralai/mixtral-8x7b-instruct", // 🔥 strong + cheap
-      messages: [
-        { role: "system", content: "You are a helpful assistant." },
-        { role: "user", content: message }
-      ],
-      max_tokens: 200,
-      temperature: 0.7
+    // Create agent executor for this session
+    const agent = await initializeAgentExecutorWithOptions(tools, llm, {
+      agentType: "chat-conversational-react-description",
+      memory: sessions[sessionId],
+      verbose: true,
     });
 
-    const reply = completion.choices[0].message.content;
+    const response = await agent.call({ input: message });
 
-    res.json({ reply });
+    res.json({ reply: response.output });
 
   } catch (err) {
-    console.error("OPENROUTER ERROR:", err);
-    res.status(500).json({ reply: "Error calling AI API" });
+    console.error("LANGCHAIN ERROR:", err);
+    res.status(500).json({ reply: "Error processing request" });
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("OpenRouter backend running");
+// Reset memory
+app.post("/api/reset", (req, res) => {
+  const { sessionId } = req.body;
+  delete sessions[sessionId];
+  res.json({ message: "Session memory reset" });
 });
 
-app.listen(process.env.PORT || 5000);
+app.listen(process.env.PORT || 5000, () =>
+  console.log("LangChain agent backend running")
+);
