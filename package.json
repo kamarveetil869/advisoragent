@@ -1,7 +1,7 @@
 {
-  "name": "mcp-gemini-agent",
+  "name": "mcp-gemini3-agent",
   "version": "1.0.0",
-  "description": "MCP-style AI agent using Gemini API with tool calling and Ethos integration",
+  "description": "MCP-style AI agent using Gemini 3 Flash Preview with tool calling and Ethos integration",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -11,7 +11,8 @@
   },
   "keywords": [
     "mcp",
-    "gemini",
+    "gemini3",
+    "genai",
     "ai-agent",
     "tool-calling",
     "express"
@@ -19,7 +20,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@google/genai": "^0.15.0",
+    "@google/genai": "^0.5.0",
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
