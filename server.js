@@ -1,11 +1,10 @@
 import express from "express";
 import cors from "cors";
-import { OpenAI } from "langchain/llms/openai.js";
-import { initializeAgentExecutorWithOptions } from "langchain/agents.js";
-import { Tool } from "langchain/tools.js";
-import { ChatMemory } from "langchain/memory.js";
-import { evaluate } from "mathjs";
 import "dotenv/config";
+
+import { OpenAI } from "langchain";
+import { initializeAgentExecutorWithOptions, Tool, ChatMemory } from "langchain";
+import { evaluate } from "mathjs";
 
 const app = express();
 app.use(cors());
