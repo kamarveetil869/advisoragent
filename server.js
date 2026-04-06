@@ -3,7 +3,7 @@ import cors from "cors";
 import "dotenv/config";
 
 import { OpenAI } from "langchain";
-import { initializeAgentExecutorWithOptions, Tool, ChatMemory } from "langchain";
+import { initializeAgentExecutorWithOptions, Tool, BufferMemory  } from "langchain";
 import { evaluate } from "mathjs";
 
 const app = express();
