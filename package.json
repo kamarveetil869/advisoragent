@@ -1,7 +1,7 @@
 {
   "name": "langchain-agent-backend",
   "version": "1.0.0",
-  "description": "LangChain agent backend with OpenRouter/OpenAI-compatible LLM, chat memory, and tools",
+  "description": "LangChain agent backend with OpenRouter LLM, tools, and session memory",
   "main": "server.js",
   "type": "module",
   "scripts": {
