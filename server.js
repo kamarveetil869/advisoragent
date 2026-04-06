@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
-import { OpenAI } from "langchain/llms/openai";
-import { initializeAgentExecutorWithOptions } from "langchain/agents";
-import { Tool } from "langchain/tools";
-import { ChatMemory } from "langchain/memory";
+import { OpenAI } from "langchain/llms/openai.js";
+import { initializeAgentExecutorWithOptions } from "langchain/agents.js";
+import { Tool } from "langchain/tools.js";
+import { ChatMemory } from "langchain/memory.js";
 import { evaluate } from "mathjs";
 import "dotenv/config";
 
