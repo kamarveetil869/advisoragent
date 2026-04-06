@@ -1,16 +1,16 @@
 {
   "name": "agent-backend",
   "version": "1.0.0",
-  "description": "LLM backend using Hugging Face + LangChain",
+  "description": "LLM backend using OpenRouter (OpenAI-compatible)",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
-"dependencies": {
-  "@google/genai": "^0.1.0",
-  "express": "^4.19.2",
-  "cors": "^2.8.5"
-}
+  "dependencies": {
+    "openai": "^4.0.0",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  }
 }
