@@ -9,7 +9,6 @@
     "dev": "node server.js"
   },
   "dependencies": {
-    "@langchain/community": "^0.2.0",
     "@huggingface/inference": "^3.0.0",
     "express": "^4.19.2",
     "cors": "^2.8.5"
