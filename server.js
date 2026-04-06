@@ -1,13 +1,13 @@
 import express from "express";
 import cors from "cors";
-import { InferenceClient } from "@huggingface/inference";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Hugging Face client (NEW router endpoint handled internally)
-const client = new InferenceClient(process.env.HF_API_KEY);
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.post("/api/chat", async (req, res) => {
   try {
@@ -17,24 +17,25 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ reply: "Message is required" });
     }
 
-  const response = await client.chatCompletion({
-  model: "mistralai/Mistral-7B-Instruct-v0.2",
-  messages: [
-    { role: "user", content: message }
-  ],
-  max_tokens: 200
-});
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash" // fast + cheap
+    });
 
-    res.json({ reply: response.generated_text });
+    const result = await model.generateContent(message);
+    const response = await result.response;
+
+    const reply = response.text();
+
+    res.json({ reply });
 
   } catch (err) {
-    console.error("HF ERROR:", err);
-    res.status(500).json({ reply: "Error calling Hugging Face" });
+    console.error("GEMINI ERROR:", err);
+    res.status(500).json({ reply: "Error calling Gemini API" });
   }
 });
 
 app.get("/", (req, res) => {
-  res.send("HF backend running");
+  res.send("Gemini backend running");
 });
 
 const PORT = process.env.PORT || 5000;
