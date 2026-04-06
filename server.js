@@ -2,9 +2,7 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 
-import { OpenAI } from "langchain";
-import { initializeAgentExecutorWithOptions, Tool } from "langchain";
-import { BufferMemory } from "langchain/memory/buffer.js"; // explicit import for Node ESM
+import { OpenAI, Tool, initializeAgentExecutorWithOptions } from "langchain";
 import { evaluate } from "mathjs";
 
 const app = express();
@@ -21,7 +19,7 @@ const llm = new OpenAI({
 // Define tools
 const calculator = new Tool({
   name: "Calculator",
-  description: "Performs math calculations.",
+  description: "Performs math calculations",
   func: async (input) => {
     try {
       return evaluate(input).toString();
@@ -33,39 +31,42 @@ const calculator = new Tool({
 
 const getTime = new Tool({
   name: "GetTime",
-  description: "Returns current server time in ISO format.",
+  description: "Returns current server time in ISO format",
   func: async () => new Date().toISOString(),
 });
 
 const tools = [calculator, getTime];
 
-// Session memory
-const sessions = {};
+// Session memory (manual implementation)
+const sessions = {}; // sessionId -> array of messages
 
-// Chat endpoint
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, sessionId } = req.body;
     if (!message) return res.status(400).json({ reply: "Message required" });
     if (!sessionId) return res.status(400).json({ reply: "sessionId required" });
 
-    // Initialize session memory
-    if (!sessions[sessionId]) {
-      sessions[sessionId] = new BufferMemory({
-        memoryKey: "chat_history",
-        returnMessages: true,
-      });
-    }
+    // Initialize session messages array
+    if (!sessions[sessionId]) sessions[sessionId] = [];
 
-    // Create agent executor
+    // Add user message to session
+    sessions[sessionId].push({ role: "user", content: message });
+
+    // Initialize agent
     const agent = await initializeAgentExecutorWithOptions(tools, llm, {
       agentType: "chat-conversational-react-description",
-      memory: sessions[sessionId],
       verbose: true,
+      // Use the session messages as memory substitute
+      memory: {
+        loadMemoryVariables: async () => ({ chat_history: sessions[sessionId] }),
+        saveContext: async ({ input, output }) => {
+          sessions[sessionId].push({ role: "assistant", content: output });
+        },
+      },
     });
 
+    // Run agent
     const response = await agent.call({ input: message });
-
     res.json({ reply: response.output });
   } catch (err) {
     console.error("LANGCHAIN ERROR:", err);
