@@ -35,7 +35,7 @@ const model = new ChatOpenAI({
 
 // --------- Utility: authenticate Ellucian ---------
 async function authenticate(apiKey) {
-  const authResponse = await fetch("https://integrate.elluciancloud.ie/auth", {
+  const authResponse = await fetch("https://integrate.elluciancloud.com/auth", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey }),
@@ -46,50 +46,32 @@ async function authenticate(apiKey) {
 
 // --------- Tools (Multiple APIs) ---------
 
-const gpaTool = new DynamicTool({
-  name: "get_gpa",
-  description: "Get the GPA of a student by name. Input should be the student name.",
+const advisorTool = new DynamicTool({
+  name: "advisors",
+  description: "Get list of advosrs.",
   func: async (name) => {
     try {
       const token = await authenticate(process.env.ELLUCIAN_API_KEY);
       const res = await fetch(
-        `https://integrate.elluciancloud.ie/api/gpa?search=${encodeURIComponent(name)}`,
+        `https://integrate.elluciancloud.ie/api/x-albion-advisor-list?criteria=${encodeURIComponent(name)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await res.json();
-      if (!data || data.length === 0) return `GPA for ${name} not found.`;
-      return `Student ${name} has GPA ${data[0].gpa}`;
+      if (!data || data.length === 0) return `details for ${name} not found.`;
+      return `Advisor ${name} details ${data[0].advrName}`;
     } catch (err) {
       console.error(err);
-      return `Error fetching GPA for ${name}`;
+      return `Error fetching details for ${name}`;
     }
   },
 });
 
-const riskTool = new DynamicTool({
-  name: "get_risk",
-  description: "Get the at-risk level of a student by name. Input should be the student name.",
-  func: async (name) => {
-    try {
-      const token = await authenticate(process.env.ELLUCIAN_API_KEY);
-      const res = await fetch(
-        `https://integrate.elluciancloud.ie/api/risk?search=${encodeURIComponent(name)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const data = await res.json();
-      if (!data || data.length === 0) return `Risk info for ${name} not found.`;
-      return `Student ${name} risk level: ${data[0].riskLevel}`;
-    } catch (err) {
-      console.error(err);
-      return `Error fetching risk for ${name}`;
-    }
-  },
-});
+
 
 // Add more tools as needed...
 
 // --------- Initialize Agent (provider-agnostic) ---------
-const tools = [gpaTool, riskTool];
+// const tools = [advisorTool];
 
 let agentExecutor;
 (async () => {
