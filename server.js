@@ -1,18 +1,19 @@
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
-import OpenAI from "openai";
 import axios from "axios";
 import { evaluate } from "mathjs";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /* =========================================================
-   🔐 ETHOS TOKEN CACHE (with buffer)
+   🔐 ETHOS TOKEN CACHE
 ========================================================= */
 let cachedToken = null;
 let tokenExpiry = null;
@@ -23,6 +24,8 @@ async function getEthosToken() {
   }
 
   try {
+    console.log("🔑 Fetching new token...");
+
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
       { apiKey: process.env.ETHOS_API_KEY },
@@ -32,59 +35,50 @@ async function getEthosToken() {
     const token = response.data.access_token;
     const expiresIn = response.data.expires_in || 3600;
 
-    // Refresh 5 minutes early
     cachedToken = token;
     tokenExpiry = Date.now() + (expiresIn - 300) * 1000;
 
     return token;
   } catch (err) {
-    console.error("❌ Ethos auth failed:", err.response?.data || err.message);
+    console.error("❌ Auth failed:", err.response?.data || err.message);
     return null;
   }
 }
 
 /* =========================================================
-   🧰 TOOL DEFINITIONS (MCP STYLE)
+   🧰 TOOL DEFINITIONS (Gemini format)
 ========================================================= */
 const tools = [
   {
-    type: "function",
-    function: {
-      name: "calculator",
-      description: "Evaluate a math expression",
-      parameters: {
-        type: "object",
-        properties: {
-          expression: { type: "string" }
-        },
-        required: ["expression"]
+    functionDeclarations: [
+      {
+        name: "calculator",
+        description: "Evaluate a math expression",
+        parameters: {
+          type: "object",
+          properties: {
+            expression: { type: "string" }
+          },
+          required: ["expression"]
+        }
+      },
+      {
+        name: "get_time",
+        description: "Get current server time",
+        parameters: { type: "object", properties: {} }
+      },
+      {
+        name: "get_my_advisees",
+        description: "Retrieve advisees for an advisor",
+        parameters: {
+          type: "object",
+          properties: {
+            advisorId: { type: "string" }
+          },
+          required: ["advisorId"]
+        }
       }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_time",
-      description: "Get current server time",
-      parameters: {
-        type: "object",
-        properties: {}
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_my_advisees",
-      description: "Retrieve advisees for a given advisor",
-      parameters: {
-        type: "object",
-        properties: {
-          advisorId: { type: "string" }
-        },
-        required: ["advisorId"]
-      }
-    }
+    ]
   }
 ];
 
@@ -93,35 +87,27 @@ const tools = [
 ========================================================= */
 const toolHandlers = {
   calculator: async ({ expression }) => {
-    try {
-      return evaluate(expression).toString();
-    } catch {
-      return "Invalid calculation";
-    }
+    try { return evaluate(expression).toString(); }
+    catch { return "Invalid calculation"; }
   },
 
-  get_time: async () => {
-    return new Date().toISOString();
-  },
+  get_time: async () => new Date().toISOString(),
 
   get_my_advisees: async ({ advisorId }) => {
     const token = await getEthosToken();
-    if (!token) return "Authentication failed";
+    if (!token) return "Auth failed";
 
     try {
       const response = await axios.get(
-        `${process.env.ETHOS_BASE_URL}/api/x-get-advisees`,
+        `${process.env.ETHOS_BASE_URL}/x-get-advisees`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
+          headers: { Authorization: `Bearer ${token}` },
           params: { advisor_id: advisorId }
         }
       );
-
       return response.data;
     } catch (err) {
-      console.error("❌ Advisees fetch failed:", err.response?.data || err.message);
+      console.error("❌ Advisees error:", err.response?.data || err.message);
       return "Failed to fetch advisees";
     }
   }
@@ -133,7 +119,7 @@ const toolHandlers = {
 const sessions = {};
 
 /* =========================================================
-   🧠 CHAT ENDPOINT (MCP LOOP)
+   🧠 CHAT ENDPOINT (Gemini MCP LOOP)
 ========================================================= */
 app.post("/api/chat", async (req, res) => {
   const { message, sessionId } = req.body;
@@ -144,66 +130,67 @@ app.post("/api/chat", async (req, res) => {
 
   if (!sessions[sessionId]) sessions[sessionId] = [];
 
-  sessions[sessionId].push({ role: "user", content: message });
+  sessions[sessionId].push({ role: "user", parts: [{ text: message }] });
 
-  const messages = [
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    tools
+  });
+
+  let contents = [
     {
-      role: "system",
-      content: `
-You are an intelligent assistant with tool access.
+      role: "user",
+      parts: [{ text: `
+You are an assistant with tools:
+- calculator
+- get_time
+- get_my_advisees
 
-Use tools when appropriate:
-- calculator → math
-- get_time → current time
-- get_my_advisees → student/advisee data
-
-Always prefer tools when relevant.
-`
+Use tools when appropriate.
+`}]
     },
     ...sessions[sessionId]
   ];
 
   try {
-    let response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages,
-      tools,
-      tool_choice: "auto",
-      temperature: 0.7
-    });
+    let result = await model.generateContent({ contents });
+    let response = result.response;
+    let part = response.candidates[0].content.parts[0];
 
-    let msg = response.choices[0].message;
+    // 🔁 TOOL LOOP
+    while (part.functionCall) {
+      const { name, args } = part.functionCall;
 
-    // 🔁 TOOL LOOP (supports chaining)
-    while (msg.tool_calls) {
-      for (const toolCall of msg.tool_calls) {
-        const toolName = toolCall.function.name;
-        const args = JSON.parse(toolCall.function.arguments || "{}");
+      console.log("🛠 Tool:", name, args);
 
-        console.log(`🛠 Tool called: ${toolName}`, args);
+      const toolResult = await toolHandlers[name](args);
 
-        const result = await toolHandlers[toolName](args);
-
-        messages.push(msg);
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result)
-        });
-      }
-
-      response = await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages,
-        tools
+      contents.push({
+        role: "model",
+        parts: [{ functionCall: { name, args } }]
       });
 
-      msg = response.choices[0].message;
+      contents.push({
+        role: "user",
+        parts: [{
+          functionResponse: {
+            name,
+            response: { result: toolResult }
+          }
+        }]
+      });
+
+      result = await model.generateContent({ contents });
+      response = result.response;
+      part = response.candidates[0].content.parts[0];
     }
 
-    const reply = msg.content;
+    const reply = part.text;
 
-    sessions[sessionId].push({ role: "assistant", content: reply });
+    sessions[sessionId].push({
+      role: "model",
+      parts: [{ text: reply }]
+    });
 
     res.json({ reply });
 
@@ -214,24 +201,15 @@ Always prefer tools when relevant.
 });
 
 /* =========================================================
-   🔄 RESET
+   RESET + HEALTH
 ========================================================= */
 app.post("/api/reset", (req, res) => {
-  const { sessionId } = req.body;
-  delete sessions[sessionId];
+  delete sessions[req.body.sessionId];
   res.json({ message: "Session reset" });
 });
 
-/* =========================================================
-   ❤️ HEALTH
-========================================================= */
-app.get("/", (req, res) => {
-  res.send("MCP Agent running ✅");
-});
+app.get("/", (req, res) => res.send("Gemini MCP Agent running ✅"));
 
-/* =========================================================
-   🚀 START
-========================================================= */
-app.listen(process.env.PORT || 5000, () => {
-  console.log("Server running 🚀");
-});
+app.listen(process.env.PORT || 5000, () =>
+  console.log("Server running 🚀")
+);
