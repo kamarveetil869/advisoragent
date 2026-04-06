@@ -1,12 +1,15 @@
 import express from "express";
 import cors from "cors";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 
 app.post("/api/chat", async (req, res) => {
   try {
@@ -16,19 +19,28 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ reply: "Message is required" });
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-pro"   // ✅ THIS is the key fix
+    const completion = await client.chat.completions.create({
+      model: "mistralai/mixtral-8x7b-instruct", // 🔥 strong + cheap
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: message }
+      ],
+      max_tokens: 200,
+      temperature: 0.7
     });
 
-    const result = await model.generateContent(message);
-    const response = await result.response;
+    const reply = completion.choices[0].message.content;
 
-    res.json({ reply: response.text() });
+    res.json({ reply });
 
   } catch (err) {
-    console.error("GEMINI ERROR:", err);
-    res.status(500).json({ reply: "Error calling Gemini API" });
+    console.error("OPENROUTER ERROR:", err);
+    res.status(500).json({ reply: "Error calling AI API" });
   }
+});
+
+app.get("/", (req, res) => {
+  res.send("OpenRouter backend running");
 });
 
 app.listen(process.env.PORT || 5000);
