@@ -1,92 +1,70 @@
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
-
 import OpenAI from "openai";
 import { evaluate } from "mathjs";
-import { Tool, initializeAgentExecutorWithOptions } from "langchain";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize LLM
-const llm = new OpenAI({
-  openAIApiKey: process.env.OPENROUTER_API_KEY,
-  modelName: "mistralai/mixtral-8x7b-instruct",
-  temperature: 0.7,
-});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Define tools
-const calculator = new Tool({
-  name: "Calculator",
-  description: "Performs math calculations",
-  func: async (input) => {
-    try {
-      return evaluate(input).toString();
-    } catch {
-      return "Invalid calculation";
-    }
+const tools = {
+  Calculator: async (input) => {
+    try { return evaluate(input).toString(); }
+    catch { return "Invalid calculation"; }
   },
-});
+  GetTime: async () => new Date().toISOString(),
+};
 
-const getTime = new Tool({
-  name: "GetTime",
-  description: "Returns current server time in ISO format",
-  func: async () => new Date().toISOString(),
-});
-
-const tools = [calculator, getTime];
-
-// Session memory (manual implementation)
-const sessions = {}; // sessionId -> array of messages
+const sessions = {};
 
 app.post("/api/chat", async (req, res) => {
-  try {
-    const { message, sessionId } = req.body;
-    if (!message) return res.status(400).json({ reply: "Message required" });
-    if (!sessionId) return res.status(400).json({ reply: "sessionId required" });
+  const { message, sessionId } = req.body;
+  if (!message || !sessionId) return res.status(400).json({ reply: "message and sessionId required" });
 
-    // Initialize session messages array
-    if (!sessions[sessionId]) sessions[sessionId] = [];
+  if (!sessions[sessionId]) sessions[sessionId] = [];
 
-    // Add user message to session
-    sessions[sessionId].push({ role: "user", content: message });
+  sessions[sessionId].push({ role: "user", content: message });
 
-    // Initialize agent
-    const agent = await initializeAgentExecutorWithOptions(tools, llm, {
-      agentType: "chat-conversational-react-description",
-      verbose: true,
-      // Use the session messages as memory substitute
-      memory: {
-        loadMemoryVariables: async () => ({ chat_history: sessions[sessionId] }),
-        saveContext: async ({ input, output }) => {
-          sessions[sessionId].push({ role: "assistant", content: output });
-        },
-      },
-    });
+  const prompt = [
+    ...sessions[sessionId],
+    { role: "system", content: "You are a helpful assistant with access to tools: Calculator, GetTime." }
+  ];
 
-    // Run agent
-    const response = await agent.call({ input: message });
-    res.json({ reply: response.output });
-  } catch (err) {
-    console.error("LANGCHAIN ERROR:", err);
-    res.status(500).json({ reply: "Error processing request" });
+  // Simple tool parsing
+  let toolUsed = null;
+  if (message.includes("calculate") || message.match(/\d/)) {
+    const calcResult = await tools.Calculator(message);
+    sessions[sessionId].push({ role: "assistant", content: calcResult });
+    return res.json({ reply: calcResult });
   }
+
+  if (message.toLowerCase().includes("time")) {
+    const time = await tools.GetTime();
+    sessions[sessionId].push({ role: "assistant", content: time });
+    return res.json({ reply: time });
+  }
+
+  // LLM call
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: prompt,
+    temperature: 0.7,
+  });
+
+  const reply = completion.choices[0].message.content;
+  sessions[sessionId].push({ role: "assistant", content: reply });
+  res.json({ reply });
 });
 
-// Reset session memory
 app.post("/api/reset", (req, res) => {
   const { sessionId } = req.body;
   if (sessions[sessionId]) delete sessions[sessionId];
-  res.json({ message: "Session memory reset" });
+  res.json({ message: "Session reset" });
 });
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("LangChain agent backend running ✅");
-});
+app.get("/", (req, res) => res.send("Chat agent running ✅"));
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(process.env.PORT || 5000, () => console.log("Server running"));
