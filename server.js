@@ -10,7 +10,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import fetch from "node-fetch";
 import { initializeAgentExecutorWithOptions } from "langchain/agents";
-import { Tool } from "langchain/tools";
+import { DynamicTool } from "langchain/tools";
 import { ChatOpenAI } from "langchain/chat_models/openai"; // used as generic client
 
 const app = express();
@@ -46,7 +46,7 @@ async function authenticate(apiKey) {
 
 // --------- Tools (Multiple APIs) ---------
 
-const gpaTool = new Tool({
+const gpaTool = new DynamicTool({
   name: "get_gpa",
   description: "Get the GPA of a student by name. Input should be the student name.",
   func: async (name) => {
@@ -66,7 +66,7 @@ const gpaTool = new Tool({
   },
 });
 
-const riskTool = new Tool({
+const riskTool = new DynamicTool({
   name: "get_risk",
   description: "Get the at-risk level of a student by name. Input should be the student name.",
   func: async (name) => {
