@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
@@ -12,15 +11,31 @@ app.use(express.json());
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- Function to get Ethos auth token ---
+// --- Token caching ---
+let cachedToken = null;
+let tokenExpiry = null;
+
 async function getEthosToken() {
+  // Return cached token if valid
+  if (cachedToken && tokenExpiry && new Date() < tokenExpiry) {
+    return cachedToken;
+  }
+
   try {
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
-      { apiKey: process.env.ETHOS_API_KEY }, // pass API key in body
+      { apiKey: process.env.ETHOS_API_KEY },
       { headers: { "Content-Type": "application/json" } }
     );
-    return response.data.access_token; // assumes token returned as access_token
+
+    const token = response.data.access_token;
+    const expiresIn = response.data.expires_in || 3600; // default 1 hour if not provided
+
+    // Cache the token and expiry
+    cachedToken = token;
+    tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+
+    return token;
   } catch (err) {
     console.error("Failed to get Ethos token:", err.response?.data || err.message);
     return null;
@@ -42,7 +57,7 @@ const tools = {
 
     try {
       const response = await axios.get(
-        `${process.env.ETHOS_BASE_URL}/api/x-get-advisees`,
+        `${process.env.ETHOS_BASE_URL}/x-get-advisees`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
