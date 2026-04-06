@@ -1,13 +1,14 @@
 import express from "express";
 import cors from "cors";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 app.post("/api/chat", async (req, res) => {
   try {
@@ -17,16 +18,12 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ reply: "Message is required" });
     }
 
-    const model = genAI.getGenerativeModel({
-     model: "gemini-1.0-pro"
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: message,
     });
 
-    const result = await model.generateContent(message);
-    const response = await result.response;
-
-    const reply = response.text();
-
-    res.json({ reply });
+    res.json({ reply: response.text });
 
   } catch (err) {
     console.error("GEMINI ERROR:", err);
@@ -34,9 +31,4 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Gemini backend running");
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(process.env.PORT || 5000);
