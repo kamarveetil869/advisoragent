@@ -3,14 +3,15 @@ import cors from "cors";
 import "dotenv/config";
 import axios from "axios";
 import { evaluate } from "mathjs";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
 /* =========================================================
    🔐 ETHOS TOKEN CACHE
@@ -131,9 +132,9 @@ app.post("/api/chat", async (req, res) => {
   if (!sessions[sessionId]) sessions[sessionId] = [];
 
   sessions[sessionId].push({ role: "user", parts: [{ text: message }] });
-
+ 
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+   model: "gemini-3-flash-preview",
     tools
   });
 
