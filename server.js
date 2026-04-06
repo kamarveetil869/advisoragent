@@ -18,7 +18,7 @@ app.use(express.json());
 
 const model = new HuggingFaceInference({
   apiKey: process.env.HF_API_KEY,
-  model: process.env.HF_MODEL || "mistralai/Mistral-7B-Instruct-v0.2",
+  model: process.env.HF_MODEL ,
   temperature: 0.3,
   maxTokens: 512,
   baseUrl: "https://router.huggingface.co",
