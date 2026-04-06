@@ -53,7 +53,7 @@ const advisorTool = new DynamicTool({
     try {
       const token = await authenticate(process.env.ELLUCIAN_API_KEY);
       const res = await fetch(
-        `https://integrate.elluciancloud.ie/api/x-albion-advisor-list?criteria=${encodeURIComponent(name)}`,
+        `https://integrate.elluciancloud.com/api/x-albion-advisor-list?criteria=${encodeURIComponent(name)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await res.json();
@@ -71,7 +71,8 @@ const advisorTool = new DynamicTool({
 // Add more tools as needed...
 
 // --------- Initialize Agent (provider-agnostic) ---------
-// const tools = [advisorTool];
+
+const tools = [advisorTool];
 
 let agentExecutor;
 (async () => {
