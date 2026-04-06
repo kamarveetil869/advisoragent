@@ -1,14 +1,12 @@
 import express from "express";
 import cors from "cors";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.post("/api/chat", async (req, res) => {
   try {
@@ -18,12 +16,14 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ reply: "Message is required" });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: message,
+    const model = genAI.getGenerativeModel({
+      model: "gemini-pro"   // ✅ THIS is the key fix
     });
 
-    res.json({ reply: response.text });
+    const result = await model.generateContent(message);
+    const response = await result.response;
+
+    res.json({ reply: response.text() });
 
   } catch (err) {
     console.error("GEMINI ERROR:", err);
