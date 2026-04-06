@@ -2,12 +2,9 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 
-import { OpenAI } from "langchain/llms/openai"; // works in 0.2.x
-import { Tool } from "langchain/tools";
-import { initializeAgentExecutorWithOptions } from "langchain/agents";
-import { BufferMemory } from "langchain/memory"; // works in 0.2.x
+import OpenAI from "openai";
 import { evaluate } from "mathjs";
-
+import { Tool, initializeAgentExecutorWithOptions } from "langchain";
 
 const app = express();
 app.use(cors());
