@@ -9,9 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Gemini client
-
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
+// Initialize GenAI client
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY
+});
 
 /* =========================================================
    🔐 ETHOS TOKEN CACHE
@@ -26,7 +27,6 @@ async function getEthosToken() {
 
   try {
     console.log("🔑 Fetching new token...");
-
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
       { apiKey: process.env.ETHOS_API_KEY },
@@ -37,17 +37,17 @@ async function getEthosToken() {
     const expiresIn = response.data.expires_in || 3600;
 
     cachedToken = token;
-    tokenExpiry = Date.now() + (expiresIn - 300) * 1000;
+    tokenExpiry = Date.now() + (expiresIn - 300) * 1000; // refresh 5 min early
 
     return token;
   } catch (err) {
-    console.error("❌ Auth failed:", err.response?.data || err.message);
+    console.error("❌ Ethos auth failed:", err.response?.data || err.message);
     return null;
   }
 }
 
 /* =========================================================
-   🧰 TOOL DEFINITIONS (Gemini format)
+   🧰 TOOL DEFINITIONS
 ========================================================= */
 const tools = [
   {
@@ -57,9 +57,7 @@ const tools = [
         description: "Evaluate a math expression",
         parameters: {
           type: "object",
-          properties: {
-            expression: { type: "string" }
-          },
+          properties: { expression: { type: "string" } },
           required: ["expression"]
         }
       },
@@ -73,9 +71,7 @@ const tools = [
         description: "Retrieve advisees for an advisor",
         parameters: {
           type: "object",
-          properties: {
-            advisorId: { type: "string" }
-          },
+          properties: { advisorId: { type: "string" } },
           required: ["advisorId"]
         }
       }
@@ -96,7 +92,7 @@ const toolHandlers = {
 
   get_my_advisees: async ({ advisorId }) => {
     const token = await getEthosToken();
-    if (!token) return "Auth failed";
+    if (!token) return "Authentication failed";
 
     try {
       const response = await axios.get(
@@ -108,7 +104,7 @@ const toolHandlers = {
       );
       return response.data;
     } catch (err) {
-      console.error("❌ Advisees error:", err.response?.data || err.message);
+      console.error("❌ Advisees fetch error:", err.response?.data || err.message);
       return "Failed to fetch advisees";
     }
   }
@@ -120,7 +116,7 @@ const toolHandlers = {
 const sessions = {};
 
 /* =========================================================
-   🧠 CHAT ENDPOINT (Gemini MCP LOOP)
+   🧠 CHAT ENDPOINT (Gemini 3 Flash Preview + MCP)
 ========================================================= */
 app.post("/api/chat", async (req, res) => {
   const { message, sessionId } = req.body;
@@ -131,41 +127,46 @@ app.post("/api/chat", async (req, res) => {
 
   if (!sessions[sessionId]) sessions[sessionId] = [];
 
-  sessions[sessionId].push({ role: "user", parts: [{ text: message }] });
- 
-  const model = genAI.getGenerativeModel({
-   model: "gemini-3-flash-preview",
-    tools
+  sessions[sessionId].push({
+    role: "user",
+    parts: [{ text: message }]
   });
 
-  let contents = [
+  const contents = [
     {
       role: "user",
-      parts: [{ text: `
-You are an assistant with tools:
+      parts: [{
+        text: `
+You are an AI assistant with tools:
 - calculator
 - get_time
 - get_my_advisees
 
-Use tools when appropriate.
-`}]
+Use tools whenever appropriate.
+`
+      }]
     },
     ...sessions[sessionId]
   ];
 
   try {
-    let result = await model.generateContent({ contents });
-    let response = result.response;
+    let response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents,
+      tools
+    });
+
     let part = response.candidates[0].content.parts[0];
 
     // 🔁 TOOL LOOP
     while (part.functionCall) {
       const { name, args } = part.functionCall;
 
-      console.log("🛠 Tool:", name, args);
+      console.log("🛠 Tool call:", name, args);
 
-      const toolResult = await toolHandlers[name](args);
+      const result = await toolHandlers[name](args);
 
+      // Update conversation with tool call + result
       contents.push({
         role: "model",
         parts: [{ functionCall: { name, args } }]
@@ -176,13 +177,18 @@ Use tools when appropriate.
         parts: [{
           functionResponse: {
             name,
-            response: { result: toolResult }
+            response: { result }
           }
         }]
       });
 
-      result = await model.generateContent({ contents });
-      response = result.response;
+      // Re-generate after tool execution
+      response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents,
+        tools
+      });
+
       part = response.candidates[0].content.parts[0];
     }
 
@@ -211,6 +217,9 @@ app.post("/api/reset", (req, res) => {
 
 app.get("/", (req, res) => res.send("Gemini MCP Agent running ✅"));
 
-app.listen(process.env.PORT || 5000, () =>
-  console.log("Server running 🚀")
-);
+/* =========================================================
+   START SERVER
+========================================================= */
+app.listen(process.env.PORT || 5000, () => {
+  console.log("Server running 🚀");
+});
