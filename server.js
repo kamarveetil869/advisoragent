@@ -21,6 +21,7 @@ const model = new HuggingFaceInference({
   model: process.env.HF_MODEL || "mistralai/Mistral-7B-Instruct-v0.2",
   temperature: 0.3,
   maxTokens: 512,
+  baseUrl: "https://router.huggingface.co",
 });
 
 // --------- API endpoint ---------
