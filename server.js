@@ -17,7 +17,7 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ reply: "Message is required" });
     }
 
-    const response = await client.textGeneration({
+    const response = await client.chatCompletion({
       model: "mistralai/Mistral-7B-Instruct-v0.2",
       inputs: message,
       parameters: {
