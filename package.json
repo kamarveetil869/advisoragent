@@ -1,17 +1,13 @@
 {
-  "name": "langchain-agent-backend",
+  "name": "chat-agent-backend",
   "version": "1.0.0",
-  "description": "LangChain agent backend using OpenAI SDK, tools, and session memory",
-  "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
-    "langchain": "^1.2.0",
     "openai": "^4.8.0",
     "mathjs": "^11.10.0",
     "dotenv": "^16.3.1"
