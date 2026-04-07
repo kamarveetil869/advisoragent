@@ -26,7 +26,7 @@ async function getEthosToken() {
 
   try {
     console.log("🔑 Fetching new token...");
-        console.log("🔑 Fetching new token..."||process.env.ETHOS_BASE_URL}/auth||' '||process.env.ETHOS_API_KEY);
+        console.log("🔑 Fetching new token..."||process.env.ETHOS_BASE_URL/auth||" "||process.env.ETHOS_API_KEY);
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
       {  headers: {
