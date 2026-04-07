@@ -30,8 +30,7 @@ async function getEthosToken() {
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
       {  headers: {
-          'Authorization': `Bearer ${ process.env.ETHOS_API_KEY}`,
-          'Accept': 'application/json'
+          'Authorization': `Bearer 6020297c-8506-4f23-b2db-6c95dc0f0bee`
         } }
     );
 
