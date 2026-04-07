@@ -28,7 +28,7 @@ async function getEthosToken() {
     console.log("🔑 Fetching new token...");
         console.log("🔑 Fetching new token..."||process.env.ETHOS_BASE_URL/auth||" "||process.env.ETHOS_API_KEY);
     const response = await axios.post(
-      `${process.env.ETHOS_BASE_URL}/auth`,
+      `https://integrate.elluciancloud.com.au/auth`,
       {  headers: {
           'Authorization': `Bearer 6020297c-8506-4f23-b2db-6c95dc0f0bee`
         } }
