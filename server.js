@@ -131,7 +131,7 @@ function getFirstPart(response) {
    🤖 GEMINI CALL WITH RETRY + FALLBACK
 ========================================================= */
 async function callGemini(contents, tools) {
-  const models = ["gemini-3-flash-preview", "gemini-1.5-flash"];
+  const models = ["gemini-3-flash-preview", "gemini-2.5-flash"];
 
   for (const model of models) {
     try {
