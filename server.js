@@ -28,7 +28,7 @@ async function getEthosToken() {
     console.log("🔑 Fetching new token...");
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
-      { apiKey: process.env.ETHOS_API_KEY },
+      { Bearer: process.env.ETHOS_API_KEY },
       { headers: { "Content-Type": "application/json" } }
     );
 
