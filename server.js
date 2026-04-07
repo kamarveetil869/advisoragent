@@ -44,8 +44,8 @@ async function getEthosToken() {
   } catch (err) {
     console.error("❌ Ethos auth failed:", err.response?.data || err.message );
         console.error(" Ethos auth url:",  process.env.ETHOS_API_KEY);
-      console.error(" Ethos auth key:",  process.env.ETHOS_BASE_UR);
-      console.error("response.data:" ,  response.data);
+      console.error(" Ethos auth key:",  process.env.ETHOS_BASE_URl);
+      console.error("response.data:" ,  response);
     return null;
   }
 }
