@@ -28,11 +28,13 @@ async function getEthosToken() {
     console.log("🔑 Fetching new token...");
     const response = await axios.post(
       `${process.env.ETHOS_BASE_URL}/auth`,
-      { Bearer: process.env.ETHOS_API_KEY },
-      { headers: { "Content-Type": "application/json" } }
+      {  headers: {
+          'Authorization': `Bearer ${ process.env.ETHOS_API_KEY}`,
+          'Accept': 'application/json'
+        } }
     );
 
-    const token = response.data.access_token;
+    const token = response.data.text;
     const expiresIn = response.data.expires_in || 3600;
 
     cachedToken = token;
