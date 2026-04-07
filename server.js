@@ -34,7 +34,7 @@ async function getEthosToken() {
         } }
     );
 
-    const token = response.data.text;
+    const token = response.text;
     const expiresIn = response.data.expires_in || 3600;
 
     cachedToken = token;
@@ -109,7 +109,7 @@ const toolHandlers = {
 
     try {
       const response = await axios.get(
-        `${process.env.ETHOS_BASE_URL}/x-get-advisees`,
+        `${process.env.ETHOS_BASE_URL}/api/x-get-advisees`,
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { advisor_id: advisorId }
